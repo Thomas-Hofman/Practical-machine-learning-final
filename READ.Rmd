@@ -1,0 +1,107 @@
+---
+title: "Practical Machine Learning - John Hopkins University"
+author: "Thomas Hofman"
+date: "22-1-2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load myData, include=FALSE}
+load("myData.RData")
+```
+
+## Aim
+Predict how 'well' participants of a fitness study did their exercises based on 157 parameters and a 'classe' parameter in the training set as indicator for a good exercise. 
+
+
+### importing the datasets 
+The data for the exercise were downloaded from the practical machine learning(PML) course and were added to R from a local directory using:
+
+ 
+### Packages used
+```{r}
+library(caret);
+library(rpart);
+library(rpart.plot);
+library(randomForest);
+library(corrplot);
+library(readr)
+```
+
+### Data input
+pml_testing <- read_csv("data/pml-testing.csv") &
+pml_training <- read_csv("data/pml-training.csv")
+
+
+### set X1 as NULL
+The data contained rownumbers as column so I deleted them
+```{r, echo=FALSE}
+pml_testing$X1 <- NULL
+pml_training$X1 <- NULL
+```
+
+### Determine size of dataset 
+```{r}
+dim(pml_testing)
+dim(pml_training)
+```
+
+### Remove columns containing missing values
+As there were plenty of columns containing missing data I deleted these columns. Another stategy would be to use nearest neighbour strategies to replace them with predicted values. 
+```{r}
+pml_training <- pml_training[ , colSums(is.na(pml_training)) == 0]
+```
+57 variables remained. This is enough for a prediction model. Therefore I decided not to replace the missing values. 
+
+### I created a test and traning dataset so i could test the produced predictinthodg model.
+test and train traindata 80-20%: 
+```{r}
+Partition <- createDataPartition(pml_training$classe, p =0.8, list = F)
+TrainTrian <- pml_training[Partition, ]
+TestTrain <- pml_training[-Partition, ]
+dim(TrainTrian)
+dim(TestTrain)
+```
+
+### Generate random forests to generate a prediction model. 
+The RF is crossvalidated using the CVdata and is crossvalidated four times. Running the model took forever so to speed things up I set the number of trees to be 200.  
+
+CVdata <- trainControl(method="cv", 4)
+RFtrain <- train(classe~. ,data = TrainTrian, method = "rf", trControl=CVdata, prox = T, ntree = 200)
+```{r}
+RFtrain
+```
+
+
+### Use the model prediction on the testdata
+The predictionmodel was tested agianst the testset. 
+```{r}
+RFtest <- predict(RFtrain, TestTrain)
+summary(RFtest)
+```
+
+
+### conduct confusion matrix for out of sample error 
+To test how well the model is predicting the outcome I conducted a confusionmatrix. This matrix returns the accuracy of the prediction. 1-accuracy is the out of sample error. 
+
+R didn't recognize classe as factor so> 
+```{r}
+TestTrain$classe <- as.factor(TestTrain$classe)
+```
+```{r}
+confusionMatrix(TestTrain$classe, RFtest)
+```
+The confusion matrix shows us that the accuracy is 0.9995 so 0.05% out of sampling error. Since the accuracy and the out of sampling error are sufficient for predicting our testset we can use the predictionmodel to predict the outcome of our test set. 
+
+### Apply to original testdata (pml_testing)
+```{r}
+final <- predict(RFtrain, pml_testing)
+final
+```
+This is how well i predicted the testset performed the exercises based on the random forrest prediction model. 
+
